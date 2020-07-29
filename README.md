@@ -1,2 +1,3 @@
-# galaxy-netdevopsx
-The galaxy collections
+# Ansible Collection - netdevopsx.awx
+
+Documentation for the collection.
