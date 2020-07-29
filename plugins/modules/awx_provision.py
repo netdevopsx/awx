@@ -154,23 +154,27 @@ class Tower_provison:
         self.config_current = {}
         self.results = list()
         self.tower_settings = {
-            'LOG_AGGREGATOR_HOST'       : { 'default': '' },
+            'LOG_AGGREGATOR_HOST'       : { 'default': None },
             'LOG_AGGREGATOR_PASSWORD'   : { 'default': '' },
-            'AUTH_LDAP_START_TLS'       : { 'default': '' },
+            'AUTH_LDAP_START_TLS'       : { 'default': False },
             'AUTH_LDAP_SERVER_URI'      : { 'default': '' },
             'AUTH_LDAP_BIND_DN'         : { 'default': '' },
             'AUTH_LDAP_BIND_PASSWORD'   : { 'default': '' },
-            'AUTH_LDAP_GROUP_TYPE'      : { 'default': '' },
+            'AUTH_LDAP_GROUP_TYPE'      : { 'default': 'MemberDNGroupType' },
             'AUTH_LDAP_REQUIRE_GROUP'   : { 'default': '' },
             'AUTH_LDAP_USER_SEARCH'     : { 'default': [] },
-            'AUTH_LDAP_USER_ATTR_MAP'   : { 'default': '' },
-            'AUTH_LDAP_GROUP_SEARCH'    : { 'default': '' },
-            'AUTH_LDAP_GROUP_TYPE_PARAMS'   : { 'default': '' },
-            'AUTH_LDAP_USER_FLAGS_BY_GROUP' : { 'default': '' },
-            'AUTH_LDAP_ORGANIZATION_MAP'    : { 'default': '' },
-            'AUTH_LDAP_TEAM_MAP'            : { 'default': '' },
+            'AUTH_LDAP_USER_ATTR_MAP'   : { 'default': {} },
+            'AUTH_LDAP_GROUP_SEARCH'    : { 'default': [] },
+            'AUTH_LDAP_GROUP_TYPE_PARAMS'   : { 'default': {
+                "name_attr": "cn",
+                "member_attr": "member"
+                }
+            },
+            'AUTH_LDAP_USER_FLAGS_BY_GROUP' : { 'default': {} },
+            'AUTH_LDAP_ORGANIZATION_MAP'    : { 'default': {} },
+            'AUTH_LDAP_TEAM_MAP'            : { 'default': {} },
             'AWX_TASK_ENV'                  : { 'default': '' },
-            'AWX_PROOT_SHOW_PATHS'          : { 'default': '' }
+            'AWX_PROOT_SHOW_PATHS'          : { 'default': [] }
             }
         self.sync_order = (
             'organizations',
