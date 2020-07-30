@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright: (c) 2020, Maxim Generalov <maxim.generalov@netdevopsx.com>
+# Copyright: (c) 2020, Maxim Generalov <maxim.generalov@netdevopsx.com.com>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 ANSIBLE_METADATA = {
@@ -185,10 +185,12 @@ class Tower_provison:
             'projects',
             'inventory_sources',
             'job_templates',
-            'workflow_job_templates'
+            'workflow_job_templates',
+            'workflow_job_template_nodes'
         )
         self.objects_structure = {
             'organizations': {
+                'key' : 'name',
                 'id': '',
                 "leafs": {
                     'name'                    : { 'default': '' },
@@ -196,6 +198,7 @@ class Tower_provison:
                 }
             },
             'inventories': {
+                'key' : 'name',
                 'id': '',
                 "leafs": {
                     'name'                    : { 'default': '' },
@@ -213,6 +216,7 @@ class Tower_provison:
                  }
             },
             'teams': {
+                'key' : 'name',
                 'id': '',
                 "leafs": {
                     'name'                    : { 'default': '' }
@@ -222,6 +226,7 @@ class Tower_provison:
                 }
             },
             'credential_types': {
+                'key' : 'name',
                 'id': '',
                 "leafs": {
                     'name'                    : { 'default': '' },
@@ -233,6 +238,7 @@ class Tower_provison:
                 }
             },
             'credentials': {
+                'key' : 'name',
                 'id': '',
                 "leafs": {
                     'name'                    : { 'default': '' },
@@ -250,6 +256,7 @@ class Tower_provison:
                  }
             },
             'projects': {
+                'key' : 'name',
                 'id': '',
                 "leafs": {
                     'name'                    : { 'default': '' },
@@ -275,6 +282,7 @@ class Tower_provison:
                  }
             },
             'inventory_sources': {
+                'key' : 'name',
                 'id': '',
                 "leafs": {
                     'name'                    : { 'default': '' },
@@ -299,6 +307,7 @@ class Tower_provison:
                 }
             },
             'job_templates': {
+                'key' : 'name',
                 'id': '',
                 "leafs": {
                     'name'                    : { 'default': '' },
@@ -341,6 +350,7 @@ class Tower_provison:
                  }
             },
             'workflow_job_templates': {
+                'key' : 'name',
                 'id': '',
                 "leafs": {
                     'name'                    : { 'default': '' },
@@ -353,6 +363,18 @@ class Tower_provison:
                     'name'                    : { 'default': '' },
                     'enabled'                 : { 'default': False },
                     'rrule'                   : { 'default': '' }
+                }
+            },
+            'workflow_job_template_nodes': {
+                'key' : 'identifier',
+                'id': '',
+                "leafs": {
+                    'identifier'              : { 'default': '' },
+                    'extra_data'              : { 'default': '' }
+                },
+                "links": {
+                    'workflow_job_template'   : { 'target': 'workflow_job_templates' },
+                    'unified_job_template'    : { 'target': 'job_templates' }
                 }
             }
         }
@@ -542,12 +564,13 @@ class Tower_provison:
 
         current_objects  = self.config_current[object_type]
         desired_objects = self.config_desired[object_type]
+        key = self.objects_structure[object_type]['key']
 
-        j_query = "[].name"
+        j_query = f"[].{key}"
         object_names = set(jmespath.search(j_query, current_objects + desired_objects))
 
         for object_name in object_names:
-            j_query = "[?name=='{0}']|[0]".format(object_name)
+            j_query = f"[?{key}=='{object_name}']|[0]"
             current_object_search = jmespath.search(j_query, current_objects)
             desired_object_search = jmespath.search(j_query, desired_objects)
 
@@ -575,12 +598,13 @@ class Tower_provison:
     def object_create(self, object_type: str, object_to_create: dict):
 
         bodies = self.create_bodies(object_type, object_to_create)
+        object_key = self.objects_structure[object_type]['key']
         
         # Main
         change = ('/api/v2/{0}/'.format(object_type), "POST", bodies['main'] )
         main_object = self.tower_connect.update(*change)
         object_id = main_object.get('id')
-        self.results.append('New: object type: {0} ID: {1} Name: {2}'.format(object_type, object_id, object_to_create.get('name') ))
+        self.results.append('New: object type: {0} ID: {1} Name: {2}'.format(object_type, object_id, object_to_create.get(object_key) ))
         
         # Update config_current on the fly
         object_to_create['id'] = object_id
@@ -797,6 +821,58 @@ class Tower_provison:
                 change = ('/api/v2/inventory_sources/{0}/update/'.format(current_inventory_source_failed['id']),'POST', {})
                 self.tower_connect.update(*change)
                 self.results.append('Refreshed: object type: {0} ID: {1} Name: {2}'.format(object_type, current_inventory_source_failed['id'], current_inventory_source_failed['name'] ))
+
+        # Refresh the always_nodes, 
+        if object_type == 'workflow_job_template_nodes':
+            self.sync_workflow_job_template_nodes_relationship()
+
+    def sync_workflow_job_template_nodes_relationship(self):
+
+        # Pull always_nodes, failure_nodes and success_nodes
+        tower_objects = self.tower_connect.get('/api/v2/workflow_job_template_nodes/','results')
+        
+        for tower_object in tower_objects:
+            object_id = tower_object['id']
+            identifier = tower_object['identifier']
+            current = {
+                'always_nodes': tower_object['always_nodes'],
+                'failure_nodes': tower_object['failure_nodes'],
+                'success_nodes': tower_object['success_nodes'],
+            }
+
+            j_query = f"[?identifier=='{identifier}']|[0]"
+            desired_object = jmespath.search(j_query, self.input_configuration['workflow_job_template_nodes'])
+            desired = {
+                'always_nodes': desired_object.get('always_nodes',[]),
+                'failure_nodes': desired_object.get('failure_nodes',[]),
+                'success_nodes': desired_object.get('success_nodes',[]),
+            }
+            for case_type in ['always_nodes','failure_nodes','success_nodes']:
+                for case_item in desired[case_type]:
+                    j_query = f"[?identifier=='{case_item}'].id|[0]"
+                    case_item_id = jmespath.search(j_query, tower_objects)
+                    if not case_item_id:
+                        raise Warning(f'Can not find workflow_job_template_nodes: {case_item}')
+                    desired[case_type].append(case_item_id)
+                    desired[case_type].remove(case_item)
+
+                for case_item in list(set(desired[case_type])-set(current[case_type])):
+                    associate_body = { 
+                        'id': case_item,
+                        'associate': True
+                    }
+                    change = (f'/api/v2/workflow_job_template_nodes/{object_id}/always_nodes/','POST', associate_body )
+                    self.tower_connect.update(*change)
+                    self.results.append(f'New: object type: workflow_job_template_nodes ID: {object_id} Name: {identifier} {case_type} {identifier} Case_item: {case_item}')
+
+                for case_item in list(set(current[case_type])-set(desired[case_type])):
+                    disassociate_body = { 
+                        'id': case_item,
+                        'disassociate': True
+                    }
+                    change = (f'/api/v2/workflow_job_template_nodes/{object_id}/always_nodes/','POST', disassociate_body )
+                    self.tower_connect.update(*change)
+                    self.results.append(f'Deleted: object type: workflow_job_template_nodes ID: {object_id} Name: {identifier} {case_type} {identifier} Case_item: {case_item}')
 
 
     def provision(self):
